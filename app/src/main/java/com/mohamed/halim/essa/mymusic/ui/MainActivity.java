@@ -2,23 +2,18 @@ package com.mohamed.halim.essa.mymusic.ui;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.NotificationCompat;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
 import androidx.media.session.MediaButtonReceiver;
 
 import android.Manifest;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,15 +26,19 @@ import android.widget.ListView;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
+import com.mohamed.halim.essa.mymusic.data.AudioFile;
 import com.mohamed.halim.essa.mymusic.R;
 import com.mohamed.halim.essa.mymusic.adapters.AudioAdapter;
 import com.mohamed.halim.essa.mymusic.helpers.NotificationHelper;
+
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>, ExoPlayer.EventListener {
     // permission code
@@ -55,20 +54,23 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private SimpleExoPlayer mExoPlayer;
     private static MediaSessionCompat mMediaSession;
     private PlaybackStateCompat.Builder mStateBuilder;
-    private long currentPlayingId;
+    private ConcatenatingMediaSource mConcatenatingMediaSource;
+    private int currentPlayingIndex;
+    private ArrayList<AudioFile> mAudioFiles;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         // initialize views and adapter
+        mAudioFiles = new ArrayList<>();
         mAdapter = new AudioAdapter(this, null);
         mAudioListView = findViewById(R.id.music_list);
         mExoPlayerView = findViewById(R.id.exo_player);
         mAudioListView.setAdapter(mAdapter);
+        mConcatenatingMediaSource = new ConcatenatingMediaSource();
         // create a nofification channel
         NotificationHelper.createTaskNotificationChannel(this);
-
         initializeMediaSession();
         // check the permission for sdk > M
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -84,25 +86,21 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
         // start playing if a track clicked
         mAudioListView.setOnItemClickListener((parent, view, position, id) -> {
-            releasePlayer();
-            initializePlayer(id);
-            currentPlayingId = id;
+            mExoPlayer.seekTo(position, 0);
         });
     }
 
     /**
      * initilize the player and make it ready to play
      *
-     * @param id : of the track
+     * @param index : of the track
      */
-    private void initializePlayer(long id) {
+    private void initializePlayer(int index) {
         mExoPlayer = ExoPlayerFactory.newSimpleInstance(this);
         mExoPlayerView.setPlayer(mExoPlayer);
-        Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
-        MediaSource mediaSource = buildMediaSource(uri);
-        mExoPlayer.setPlayWhenReady(true);
+        mExoPlayer.setPlayWhenReady(false);
         mExoPlayer.addListener(this);
-        mExoPlayer.prepare(mediaSource, false, false);
+        mExoPlayer.seekTo(index, 0);
     }
 
     /**
@@ -116,6 +114,16 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 new DefaultDataSourceFactory(this, Util.getUserAgent(this, getPackageName()));
         return new ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(uri);
+    }
+
+    private void createAllPlayList() {
+        for (int i = 0; i < mAudioFiles.size(); i++) {
+            Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mAudioFiles.get(i).getId());
+            MediaSource mediaSource = buildMediaSource(uri);
+            mConcatenatingMediaSource.addMediaSource(mediaSource);
+        }
+        initializePlayer(0);
+        mExoPlayer.prepare(mConcatenatingMediaSource, false, false);
     }
 
     /**
@@ -148,14 +156,10 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                                 PlaybackStateCompat.ACTION_PLAY_PAUSE);
 
         mMediaSession.setPlaybackState(mStateBuilder.build());
-
-
         // MySessionCallback has methods that handle callbacks from a media controller.
         mMediaSession.setCallback(new MySessionCallback());
-
         // Start the Media Session since the activity is active.
         mMediaSession.setActive(true);
-
     }
 
 
@@ -188,24 +192,22 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (requestCode) {
-            case READ_EXTERNAL_STORAGE_REQUEST_CODE:
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // load the data if the permission granted
-                    LoaderManager.getInstance(this).initLoader(LOAD_FILES_LOADER_ID, null, this);
+        if (requestCode == READ_EXTERNAL_STORAGE_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // load the data if the permission granted
+                LoaderManager.getInstance(this).initLoader(LOAD_FILES_LOADER_ID, null, this);
 
-                } else {
-                    // ask again if not
-                    getPermission();
-                }
-                break;
-            default:
-                Log.e(TAG, "onRequestPermissionsResult: no such request code" + requestCode);
-
+            } else {
+                // ask again if not
+                getPermission();
+            }
+        } else {
+            Log.e(TAG, "onRequestPermissionsResult: no such request code" + requestCode);
         }
     }
 
 
+    @NonNull
     @Override
     public Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
         String[] projection;
@@ -227,13 +229,28 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
-        mAdapter.swapCursor(cursor);
-        cursor.moveToFirst();
+    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor audioCursor) {
+        mAdapter.swapCursor(audioCursor);
+        int idColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media._ID);
+        int titleColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
+        int artistColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
+        int albumColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ALBUM);
+        int albumIdColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID);
+        int dateAddedColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED);
+        while (audioCursor.moveToNext()) {
+            int id = audioCursor.getInt(idColumn);
+            String title = audioCursor.getString(titleColumn);
+            String artist = audioCursor.getString(artistColumn);
+            String album = audioCursor.getString(albumColumn);
+            int albumId = audioCursor.getInt(albumIdColumn);
+            int dateAdded = audioCursor.getInt(dateAddedColumn);
+            mAudioFiles.add(new AudioFile(id, title, artist, album, albumId, dateAdded));
+        }
+        createAllPlayList();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
+    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
         mAdapter.swapCursor(null);
     }
 
@@ -250,7 +267,27 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
         @Override
         public void onSkipToPrevious() {
-            mExoPlayer.seekTo(0);
+
+            if (mExoPlayer.hasPrevious() && mExoPlayer.getCurrentPosition() > 2000) {
+                mExoPlayer.previous();
+                currentPlayingIndex--;
+                AudioFile file = mAudioFiles.get(currentPlayingIndex);
+                NotificationHelper.showNotification(MainActivity.this, mStateBuilder.build(), mMediaSession,
+                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+            } else {
+                mExoPlayer.seekTo(0);
+            }
+        }
+
+        @Override
+        public void onSkipToNext() {
+            if (mExoPlayer.hasNext()) {
+                mExoPlayer.next();
+                currentPlayingIndex++;
+                AudioFile file = mAudioFiles.get(currentPlayingIndex);
+                NotificationHelper.showNotification(MainActivity.this, mStateBuilder.build(), mMediaSession,
+                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+            }
         }
     }
 
@@ -275,6 +312,15 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                     mExoPlayer.getCurrentPosition(), 1f);
         }
         mMediaSession.setPlaybackState(mStateBuilder.build());
-        NotificationHelper.showNotification(this, mStateBuilder.build(), currentPlayingId, mMediaSession);
+        AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
+        NotificationHelper.showNotification(this, mStateBuilder.build(), mMediaSession,
+                file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+    }
+
+    @Override
+    public void onPositionDiscontinuity(int reason) {
+        AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
+        NotificationHelper.showNotification(this, mStateBuilder.build(), mMediaSession,
+                file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
     }
 }

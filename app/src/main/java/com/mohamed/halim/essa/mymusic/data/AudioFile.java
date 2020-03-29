@@ -1,4 +1,4 @@
-package com.mohamed.halim.essa.mymusic;
+package com.mohamed.halim.essa.mymusic.data;
 
 public class AudioFile {
     private int id;
@@ -6,13 +6,19 @@ public class AudioFile {
     private String artist;
     private String album;
     private int albumId;
+    private int dateAdded;
 
-    public AudioFile(int id, String title, String artist, String album, int albumId) {
+    public AudioFile(int id, String title, String artist, String album, int albumId, int dateAdded) {
         this.id = id;
         this.title = title;
         this.artist = artist;
         this.album = album;
         this.albumId = albumId;
+        this.dateAdded = dateAdded;
+    }
+
+    public int getDateAdded() {
+        return dateAdded;
     }
 
     public int getId() {
