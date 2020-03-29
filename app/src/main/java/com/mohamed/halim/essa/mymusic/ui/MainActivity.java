@@ -17,6 +17,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -53,6 +55,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private SimpleExoPlayer mExoPlayer;
     private static MediaSessionCompat mMediaSession;
     private PlaybackStateCompat.Builder mStateBuilder;
+    private long currentPlayingId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,12 +86,13 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAudioListView.setOnItemClickListener((parent, view, position, id) -> {
             releasePlayer();
             initializePlayer(id);
-            showNotification(mStateBuilder.build());
+            currentPlayingId = id;
         });
     }
 
     /**
      * initilize the player and make it ready to play
+     *
      * @param id : of the track
      */
     private void initializePlayer(long id) {
@@ -103,6 +107,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     /**
      * build a media source from uri
+     *
      * @param uri : to build a media source from
      * @return : media source
      */
@@ -139,6 +144,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                         PlaybackStateCompat.ACTION_PLAY |
                                 PlaybackStateCompat.ACTION_PAUSE |
                                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
+                                PlaybackStateCompat.ACTION_SKIP_TO_NEXT |
                                 PlaybackStateCompat.ACTION_PLAY_PAUSE);
 
         mMediaSession.setPlaybackState(mStateBuilder.build());
@@ -231,20 +237,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAdapter.swapCursor(null);
     }
 
-    @Override
-    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
-        if ((playbackState == ExoPlayer.STATE_READY) && playWhenReady) {
-            mStateBuilder.setState(PlaybackStateCompat.STATE_PLAYING,
-                    mExoPlayer.getCurrentPosition(), 1f);
-        } else if ((playbackState == ExoPlayer.STATE_READY)) {
-            Log.d(TAG, "onPlayerStateChanged: PAUSED");
-            mStateBuilder.setState(PlaybackStateCompat.STATE_PAUSED,
-                    mExoPlayer.getCurrentPosition(), 1f);
-        }
-        mMediaSession.setPlaybackState(mStateBuilder.build());
-        showNotification(mStateBuilder.build());
-    }
-
     private class MySessionCallback extends MediaSessionCompat.Callback {
         @Override
         public void onPlay() {
@@ -262,54 +254,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
     }
 
-    /**
-     * Shows Media Style notification, with an action that depends on the current MediaSession
-     * PlaybackState.
-     *
-     * @param state The PlaybackState of the MediaSession.
-     */
-    private void showNotification(PlaybackStateCompat state) {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NotificationHelper.NOTI_CH_ID);
-        int icon;
-        String play_pause;
-        if (state.getState() == PlaybackStateCompat.STATE_PLAYING) {
-            icon = R.drawable.exo_controls_pause;
-            play_pause = "pause";
-        } else {
-            icon = R.drawable.exo_controls_play;
-            play_pause = "play";
-        }
-
-
-        NotificationCompat.Action playPauseAction = new NotificationCompat.Action(
-                icon, play_pause,
-                MediaButtonReceiver.buildMediaButtonPendingIntent(this,
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE));
-
-        NotificationCompat.Action restartAction = new NotificationCompat
-                .Action(R.drawable.exo_controls_previous, "restart",
-                MediaButtonReceiver.buildMediaButtonPendingIntent
-                        (this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS));
-
-        PendingIntent contentPendingIntent = PendingIntent.getActivity
-                (this, 0, new Intent(this, MainActivity.class), 0);
-
-        builder.setContentTitle("test")
-                .setContentText("test")
-                .setContentIntent(contentPendingIntent)
-                .setSmallIcon(R.drawable.music_art_place_holder)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .addAction(restartAction)
-                .addAction(playPauseAction)
-                .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
-                        .setMediaSession(mMediaSession.getSessionToken())
-                        .setShowActionsInCompactView(0, 1));
-
-
-        NotificationManager mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        mNotificationManager.notify(0, builder.build());
-    }
-
     public static class MediaReceiver extends BroadcastReceiver {
 
         public MediaReceiver() {
@@ -319,5 +263,18 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         public void onReceive(Context context, Intent intent) {
             MediaButtonReceiver.handleIntent(mMediaSession, intent);
         }
+    }
+
+    @Override
+    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+        if ((playbackState == ExoPlayer.STATE_READY) && playWhenReady) {
+            mStateBuilder.setState(PlaybackStateCompat.STATE_PLAYING,
+                    mExoPlayer.getCurrentPosition(), 1f);
+        } else if ((playbackState == ExoPlayer.STATE_READY)) {
+            mStateBuilder.setState(PlaybackStateCompat.STATE_PAUSED,
+                    mExoPlayer.getCurrentPosition(), 1f);
+        }
+        mMediaSession.setPlaybackState(mStateBuilder.build());
+        NotificationHelper.showNotification(this, mStateBuilder.build(), currentPlayingId, mMediaSession);
     }
 }

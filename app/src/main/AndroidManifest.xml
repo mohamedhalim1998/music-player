@@ -29,7 +29,6 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
-        <service android:name=".PlayingService" />
     </application>
 
 </manifest>
