@@ -17,6 +17,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.provider.MediaStore;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
@@ -47,6 +48,9 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private static final String TAG = MainActivity.class.getSimpleName();
     //  loader id for loading the media files
     private static final int LOAD_FILES_LOADER_ID = 1001;
+    private static final String CURRENT_WINDOW_INDEX_KEY = "current-window-index";
+    private static final String CURRENT_POSITION_KEY = "current-position";
+    private static final String CURRENT_STATE_KEY = "current-state";
     // List adapter
     private AudioAdapter mAdapter;
     private ListView mAudioListView;
@@ -55,8 +59,11 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private static MediaSessionCompat mMediaSession;
     private PlaybackStateCompat.Builder mStateBuilder;
     private ConcatenatingMediaSource mConcatenatingMediaSource;
-    private int currentPlayingIndex;
     private ArrayList<AudioFile> mAudioFiles;
+
+    private int mCurrentWindowIndex;
+    private long mCurrentPosition;
+    private boolean mCurrentState;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,6 +76,14 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mExoPlayerView = findViewById(R.id.exo_player);
         mAudioListView.setAdapter(mAdapter);
         mConcatenatingMediaSource = new ConcatenatingMediaSource();
+        mCurrentState = false;
+        mCurrentPosition = 0;
+        mCurrentWindowIndex = 0;
+        if (savedInstanceState != null) {
+            mCurrentState = savedInstanceState.getBoolean(CURRENT_STATE_KEY);
+            mCurrentPosition = savedInstanceState.getLong(CURRENT_POSITION_KEY);
+            mCurrentWindowIndex = savedInstanceState.getInt(CURRENT_WINDOW_INDEX_KEY);
+        }
         // create a nofification channel
         NotificationHelper.createTaskNotificationChannel(this);
         initializeMediaSession();
@@ -87,20 +102,19 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         // start playing if a track clicked
         mAudioListView.setOnItemClickListener((parent, view, position, id) -> {
             mExoPlayer.seekTo(position, 0);
+            mExoPlayer.setPlayWhenReady(true);
         });
     }
 
     /**
      * initilize the player and make it ready to play
-     *
-     * @param index : of the track
      */
-    private void initializePlayer(int index) {
+    private void initializePlayer() {
         mExoPlayer = ExoPlayerFactory.newSimpleInstance(this);
         mExoPlayerView.setPlayer(mExoPlayer);
-        mExoPlayer.setPlayWhenReady(false);
+        mExoPlayer.setPlayWhenReady(mCurrentState);
         mExoPlayer.addListener(this);
-        mExoPlayer.seekTo(index, 0);
+        mExoPlayer.seekTo(mCurrentWindowIndex, mCurrentPosition);
     }
 
     /**
@@ -122,7 +136,8 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             MediaSource mediaSource = buildMediaSource(uri);
             mConcatenatingMediaSource.addMediaSource(mediaSource);
         }
-        initializePlayer(0);
+        releasePlayer();
+        initializePlayer();
         mExoPlayer.prepare(mConcatenatingMediaSource, false, false);
     }
 
@@ -130,7 +145,11 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
      * release the player if no longer needed
      */
     private void releasePlayer() {
+
         if (mExoPlayer != null) {
+            mCurrentState = mExoPlayer.getPlayWhenReady();
+            mCurrentPosition = mExoPlayer.getCurrentPosition();
+            mCurrentWindowIndex = mExoPlayer.getCurrentWindowIndex();
             mExoPlayer.release();
             mExoPlayer = null;
         }
@@ -174,6 +193,16 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                         READ_EXTERNAL_STORAGE_REQUEST_CODE);
             }
         }
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState, @NonNull PersistableBundle outPersistentState) {
+        mCurrentState = mExoPlayer.getPlayWhenReady();
+        mCurrentPosition = mExoPlayer.getCurrentPosition();
+        mCurrentWindowIndex = mExoPlayer.getCurrentWindowIndex();
+        outState.putInt(CURRENT_WINDOW_INDEX_KEY, mCurrentWindowIndex);
+        outState.putLong(CURRENT_POSITION_KEY, mCurrentPosition);
+        outState.putBoolean(CURRENT_STATE_KEY, mCurrentState);
     }
 
     @Override
@@ -246,6 +275,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             int dateAdded = audioCursor.getInt(dateAddedColumn);
             mAudioFiles.add(new AudioFile(id, title, artist, album, albumId, dateAdded));
         }
+        //releasePlayer();
         createAllPlayList();
     }
 
@@ -270,8 +300,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
             if (mExoPlayer.hasPrevious() && mExoPlayer.getCurrentPosition() > 2000) {
                 mExoPlayer.previous();
-                currentPlayingIndex--;
-                AudioFile file = mAudioFiles.get(currentPlayingIndex);
+                AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
                 NotificationHelper.showNotification(MainActivity.this, mStateBuilder.build(), mMediaSession,
                         file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
             } else {
@@ -283,8 +312,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         public void onSkipToNext() {
             if (mExoPlayer.hasNext()) {
                 mExoPlayer.next();
-                currentPlayingIndex++;
-                AudioFile file = mAudioFiles.get(currentPlayingIndex);
+                AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
                 NotificationHelper.showNotification(MainActivity.this, mStateBuilder.build(), mMediaSession,
                         file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
             }
