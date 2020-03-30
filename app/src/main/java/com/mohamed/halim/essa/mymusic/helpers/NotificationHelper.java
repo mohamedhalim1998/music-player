@@ -1,24 +1,22 @@
 package com.mohamed.halim.essa.mymusic.helpers;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.RingtoneManager;
-import android.media.browse.MediaBrowser;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
-import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -58,9 +56,10 @@ public class NotificationHelper {
      * PlaybackState.
      *
      * @param state The PlaybackState of the MediaSession.
+     * @return
      */
-    public static void showNotification(Context context, PlaybackStateCompat state, MediaSessionCompat mediaSession,
-                                        String title, String artist, String album, int albumId) {
+    public static Notification showNotification(Context context, PlaybackStateCompat state, MediaSessionCompat mediaSession,
+                                                String title, String artist, String album, int albumId) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, NotificationHelper.NOTI_CH_ID);
         int icon;
         String play_pause;
@@ -107,6 +106,7 @@ public class NotificationHelper {
                         .setShowActionsInCompactView(0, 1));
         NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
         notificationManager.notify(0, builder.build());
+        return builder.build();
     }
 
     private static Bitmap createAlbumArt(Context context, int albumId) {
