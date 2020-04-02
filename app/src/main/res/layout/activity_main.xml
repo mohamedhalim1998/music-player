@@ -23,6 +23,9 @@
         app:controller_layout_id="@layout/exo_player_control_buttom_view"
         app:default_artwork="@drawable/music_art_place_holder"
         app:player_layout_id="@layout/exo_player_buttom_view"
+        app:repeat_toggle_modes="one"
+        app:show_shuffle_button="true"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
+
 </LinearLayout>

@@ -19,10 +19,12 @@
             style="@style/ExoMediaButton.Previous"/>
 
         <ImageButton android:id="@id/exo_shuffle"
-            style="@style/ExoMediaButton"/>
+            style="@style/ExoMediaButton"
+            android:layout_width="50dp"/>
 
         <ImageButton android:id="@id/exo_repeat_toggle"
-            style="@style/ExoMediaButton"/>
+            style="@style/ExoMediaButton"
+            android:layout_width="50dp"/>
 
         <ImageButton android:id="@id/exo_play"
             style="@style/ExoMediaButton.Play"/>
@@ -33,8 +35,7 @@
         <ImageButton android:id="@id/exo_next"
             style="@style/ExoMediaButton.Next"/>
 
-        <ImageButton android:id="@id/exo_vr"
-            style="@style/ExoMediaButton.VR"/>
+
 
     </LinearLayout>
 

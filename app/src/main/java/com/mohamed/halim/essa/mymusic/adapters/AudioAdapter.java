@@ -49,6 +49,7 @@ public class AudioAdapter extends BaseAdapter {
         audioCursor.moveToPosition(position);
         return audioCursor.getLong(audioCursor.getColumnIndex(MediaStore.Audio.Media._ID));
     }
+
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         if (convertView == null) {
@@ -64,10 +65,9 @@ public class AudioAdapter extends BaseAdapter {
         audioCursor.moveToPosition(position);
         int id = audioCursor.getInt(idColumn);
         String title = audioCursor.getString(titleColumn);
-        String artist= audioCursor.getString(artistColumn);
+        String artist = audioCursor.getString(artistColumn);
         String album = audioCursor.getString(albumColumn);
         int albumId = audioCursor.getInt(albumIdColumn);
-        Log.d(TAG, "album ID: " + albumId);
         long dataAdded = audioCursor.getLong(dataAddedColumn);
         TextView titleTextView = convertView.findViewById(R.id.title_tv);
         titleTextView.setText(title);

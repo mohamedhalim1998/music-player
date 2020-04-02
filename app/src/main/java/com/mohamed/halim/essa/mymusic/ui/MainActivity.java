@@ -74,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAdapter = new AudioAdapter(this, null);
         mAudioListView = findViewById(R.id.music_list);
         mExoPlayerView = findViewById(R.id.exo_player);
+        mExoPlayerView.showController();
         mAudioListView.setAdapter(mAdapter);
         mConcatenatingMediaSource = new ConcatenatingMediaSource();
         mCurrentState = false;
@@ -350,5 +351,15 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
         NotificationHelper.showNotification(this, mStateBuilder.build(), mMediaSession,
                 file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+    }
+
+    @Override
+    public void onShuffleModeEnabledChanged(boolean shuffleModeEnabled) {
+        mExoPlayer.setShuffleModeEnabled(shuffleModeEnabled);
+    }
+
+    @Override
+    public void onRepeatModeChanged(int repeatMode) {
+        mExoPlayer.setRepeatMode(repeatMode);
     }
 }
