@@ -1,13 +1,18 @@
 package com.mohamed.halim.essa.mymusic.data;
 
-public class AudioFile {
-    private int id;
-    private String title;
-    private String artist;
-    private String album;
-    private int albumId;
-    private int dateAdded;
+import org.parceler.Parcel;
+import org.parceler.ParcelConstructor;
 
+@Parcel
+public class AudioFile {
+    int id;
+    String title;
+    String artist;
+    String album;
+    int albumId;
+    int dateAdded;
+
+    @ParcelConstructor
     public AudioFile(int id, String title, String artist, String album, int albumId, int dateAdded) {
         this.id = id;
         this.title = title;

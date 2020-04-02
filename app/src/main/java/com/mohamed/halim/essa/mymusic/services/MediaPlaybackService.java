@@ -2,6 +2,7 @@ package com.mohamed.halim.essa.mymusic.services;
 
 import android.app.Notification;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
@@ -10,10 +11,12 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Parcelable;
 import android.provider.MediaStore;
 import android.support.v4.media.MediaBrowserCompat.MediaItem;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -23,6 +26,7 @@ import androidx.loader.app.LoaderManager;
 import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
 import androidx.media.MediaBrowserServiceCompat;
+import androidx.media.session.MediaButtonReceiver;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
@@ -37,13 +41,15 @@ import com.mohamed.halim.essa.mymusic.data.AudioFile;
 import com.mohamed.halim.essa.mymusic.helpers.NotificationHelper;
 import com.mohamed.halim.essa.mymusic.ui.MainActivity;
 
+import org.parceler.Parcels;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class MediaPlaybackService extends Service implements ExoPlayer.EventListener {
     private static final String TAG = MediaPlaybackService.class.getSimpleName();
-
-    private MediaSessionCompat mediaSession;
+    // media state vars
+    private static MediaSessionCompat mediaSession;
     private PlaybackStateCompat.Builder stateBuilder;
     private SimpleExoPlayer mExoPlayer;
     private ArrayList<AudioFile> mAudioFiles;
@@ -52,21 +58,12 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     private boolean mCurrentState;
     private ConcatenatingMediaSource mConcatenatingMediaSource;
 
-    class MyBinder extends Binder {
-        public MediaPlaybackService getService() {
-            return MediaPlaybackService.this;
-        }
-
-    }
-
     @Override
     public void onCreate() {
         super.onCreate();
         initializeMediaSession();
+        // create a ConcatenatingMediaSource to play
         mConcatenatingMediaSource = new ConcatenatingMediaSource();
-        if (mAudioFiles != null) {
-            createAllPlayList();
-        }
     }
 
     /**
@@ -74,7 +71,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
      * and media controller.
      */
     private void initializeMediaSession() {
-
+        Log.d(TAG, "initializeMediaSession: from service");
         // Create a MediaSessionCompat.
         mediaSession = new MediaSessionCompat(this, TAG);
         // Do not let MediaButtons restart the player when the app is not visible.
@@ -98,7 +95,58 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
+        mAudioFiles = Parcels.unwrap(intent.getParcelableExtra("MediaFiles"));
+        createAllPlayList();
         return new MyBinder();
+    }
+
+
+    /**
+     * build a media source from uri using
+     * DefaultDataSourceFactory
+     *
+     * @param uri : to build a media source from
+     * @return : media source
+     */
+    private MediaSource buildMediaSource(Uri uri) {
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, getPackageName()));
+        return new ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(uri);
+    }
+
+    /**
+     * Create a play list from all the tracks
+     */
+    private void createAllPlayList() {
+        Log.d(TAG, "createAllPlayList: from service");
+
+        for (int i = 0; i < mAudioFiles.size(); i++) {
+            Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mAudioFiles.get(i).getId());
+            MediaSource mediaSource = buildMediaSource(uri);
+            mConcatenatingMediaSource.addMediaSource(mediaSource);
+        }
+        releasePlayer();
+        initializePlayer();
+        mExoPlayer.prepare(mConcatenatingMediaSource, false, false);
+    }
+
+    /**
+     * initialize the player and make it ready to play
+     */
+    private void initializePlayer() {
+        mExoPlayer = ExoPlayerFactory.newSimpleInstance(this);
+        mExoPlayer.setPlayWhenReady(mCurrentState);
+        // add an event listener
+        mExoPlayer.addListener(this);
+        // set the track to play
+        mExoPlayer.seekTo(mCurrentWindowIndex, mCurrentPosition);
+        AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
+        // show the notification media control
+        Notification notification = NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
+                file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+        startForeground(0, notification);
+        Log.d(TAG, "initializePlayer: play from service");
     }
 
     /**
@@ -115,84 +163,28 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         }
     }
 
-    /**
-     * build a media source from uri
-     *
-     * @param uri : to build a media source from
-     * @return : media source
-     */
-    private MediaSource buildMediaSource(Uri uri) {
-        DataSource.Factory dataSourceFactory =
-                new DefaultDataSourceFactory(this, Util.getUserAgent(this, getPackageName()));
-        return new ProgressiveMediaSource.Factory(dataSourceFactory)
-                .createMediaSource(uri);
-    }
-
-    private void createAllPlayList() {
-        for (int i = 0; i < mAudioFiles.size(); i++) {
-            Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mAudioFiles.get(i).getId());
-            MediaSource mediaSource = buildMediaSource(uri);
-            mConcatenatingMediaSource.addMediaSource(mediaSource);
-        }
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
         releasePlayer();
-        initializePlayer();
-        mExoPlayer.prepare(mConcatenatingMediaSource, false, false);
+    }
+
+    /* ---------------------- ExoPlayer.EventListener -------------------*/
+
+    /**
+     * @return exo player object
+     */
+    public SimpleExoPlayer getExoPlayer() {
+        return mExoPlayer;
     }
 
     /**
-     * initilize the player and make it ready to play
+     * deal with player state change from play to pause and vice versa
+     * update the notification
+     *
+     * @param playWhenReady : play pause state
+     * @param playbackState : player state
      */
-    private void initializePlayer() {
-        mExoPlayer = ExoPlayerFactory.newSimpleInstance(this);
-        // mExoPlayerView.setPlayer(mExoPlayer);
-        mExoPlayer.setPlayWhenReady(mCurrentState);
-        mExoPlayer.addListener(this);
-        mExoPlayer.seekTo(mCurrentWindowIndex, mCurrentPosition);
-        AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
-        Notification notification = NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
-                file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
-        startForeground(0, notification);
-    }
-
-    public void setAudioFiles(ArrayList<AudioFile> mAudioFiles) {
-        this.mAudioFiles = mAudioFiles;
-    }
-
-    private class MySessionCallback extends MediaSessionCompat.Callback {
-        @Override
-        public void onPlay() {
-            mExoPlayer.setPlayWhenReady(true);
-        }
-
-        @Override
-        public void onPause() {
-            mExoPlayer.setPlayWhenReady(false);
-        }
-
-        @Override
-        public void onSkipToPrevious() {
-
-            if (mExoPlayer.hasPrevious() && mExoPlayer.getCurrentPosition() > 2000) {
-                mExoPlayer.previous();
-                AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
-                NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
-                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
-            } else {
-                mExoPlayer.seekTo(0);
-            }
-        }
-
-        @Override
-        public void onSkipToNext() {
-            if (mExoPlayer.hasNext()) {
-                mExoPlayer.next();
-                AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
-                NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
-                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
-            }
-        }
-    }
-
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
         if ((playbackState == ExoPlayer.STATE_READY) && playWhenReady) {
@@ -208,6 +200,12 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
                 file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
     }
 
+    /**
+     * deal with the player change tracks
+     * update the notification
+     *
+     * @param reason : of the change
+     */
     @Override
     public void onPositionDiscontinuity(int reason) {
         AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
@@ -215,7 +213,99 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
                 file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
     }
 
-    public SimpleExoPlayer getmExoPlayer() {
-        return mExoPlayer;
+    /**
+     * deal with the change in shuffle mode
+     *
+     * @param shuffleModeEnabled : the state of the shuffle mode
+     */
+    @Override
+    public void onShuffleModeEnabledChanged(boolean shuffleModeEnabled) {
+        mExoPlayer.setShuffleModeEnabled(shuffleModeEnabled);
+    }
+
+    /**
+     * deal with the change in repeat mode
+     *
+     * @param repeatMode : the state of the repeat mode
+     */
+    @Override
+    public void onRepeatModeChanged(int repeatMode) {
+        mExoPlayer.setRepeatMode(repeatMode);
+    }
+
+    /* ----------------- inner classes ------------------*/
+    // inner class for MediaSession callback
+    private class MySessionCallback extends MediaSessionCompat.Callback {
+        /**
+         * start the playback on play pressed
+         */
+        @Override
+        public void onPlay() {
+            mCurrentState = true;
+            mExoPlayer.setPlayWhenReady(true);
+        }
+
+        /**
+         * pause the playback on pause pressed
+         */
+        @Override
+        public void onPause() {
+            mCurrentState = false;
+            mExoPlayer.setPlayWhenReady(false);
+        }
+
+        /**
+         * skip to the prev track if the current track exceeds 2 s
+         * else reset the track
+         * update the notification
+         */
+        @Override
+        public void onSkipToPrevious() {
+            if (mExoPlayer.hasPrevious() && mExoPlayer.getCurrentPosition() > 2000) {
+                mExoPlayer.previous();
+                AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
+                NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
+                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+            } else {
+                mExoPlayer.seekTo(0);
+            }
+        }
+
+        /**
+         * skip to the next track
+         * update the notification
+         */
+        @Override
+        public void onSkipToNext() {
+            if (mExoPlayer.hasNext()) {
+                mExoPlayer.next();
+                AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
+                NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
+                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+            }
+        }
+    }
+
+    // inner class for broad cast handle notification action
+    public static class MediaReceiver extends BroadcastReceiver {
+
+        public MediaReceiver() {
+        }
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            MediaButtonReceiver.handleIntent(mediaSession, intent);
+        }
+    }
+
+    // inner class binder to bind the service to the activity
+    public class MyBinder extends Binder {
+        /**
+         * @return instance of the service
+         */
+        public MediaPlaybackService getService() {
+            return MediaPlaybackService.this;
+        }
+
     }
 }
