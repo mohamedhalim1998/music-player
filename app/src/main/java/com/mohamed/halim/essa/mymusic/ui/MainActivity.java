@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -40,6 +41,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private static final String TAG = MainActivity.class.getSimpleName();
     //  loader id for loading the media files
     private static final int LOAD_FILES_LOADER_ID = 1001;
+    // keys for save the parameters on the exo player
     private static final String CURRENT_WINDOW_INDEX_KEY = "current-window-index";
     private static final String CURRENT_POSITION_KEY = "current-position";
     private static final String CURRENT_STATE_KEY = "current-state";
@@ -47,22 +49,24 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private AudioAdapter mAdapter;
     private ListView mAudioListView;
     private PlayerView mExoPlayerView;
-
+    // list of all the audio files
     private ArrayList<AudioFile> mAudioFiles;
+    // instance of a MediaPlaybackService
     MediaPlaybackService mMediaPlaybackService;
-//    private ServiceConnection myServiceConnection = new ServiceConnection() {
-//        @Override
-//        public void onServiceConnected(ComponentName name, IBinder binder) {
-//            mMediaPlaybackService = ((MediaPlaybackService.MyBinder) binder).getService();
-//            Log.d(TAG, "onServiceConnected: service initialize");
-//            mExoPlayerView.setPlayer(mMediaPlaybackService.getExoPlayer());
-//        }
-//
-//        @Override
-//        public void onServiceDisconnected(ComponentName name) {
-//
-//        }
-//    };
+    // connection to the service
+    private ServiceConnection myServiceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            mMediaPlaybackService = ((MediaPlaybackService.MyBinder) binder).getService();
+            Log.d(TAG, "onServiceConnected: service initialize");
+            mExoPlayerView.setPlayer(mMediaPlaybackService.getExoPlayer());
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,18 +77,14 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAdapter = new AudioAdapter(this, null);
         mAudioListView = findViewById(R.id.music_list);
         mExoPlayerView = findViewById(R.id.exo_player);
-        mExoPlayerView.showController();
         mAudioListView.setAdapter(mAdapter);
-
-
+        // create a notification channel
         NotificationHelper.createTaskNotificationChannel(this);
         // check the permission for sdk > M
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
                 // if the permission granted read the data
                 LoaderManager.getInstance(this).initLoader(LOAD_FILES_LOADER_ID, null, this);
-
-                Log.d(TAG, "onCreate: get the list");
             } else {
                 // else ask for the permission
                 getPermission();
@@ -94,6 +94,12 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAudioListView.setOnItemClickListener((parent, view, position, id) -> {
             mMediaPlaybackService.setCurrentWindowIndex(position);
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
     }
 
     /**
@@ -122,7 +128,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     protected void onDestroy() {
         super.onDestroy();
-//        releasePlayer();
     }
 
     /**
@@ -149,10 +154,11 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
     }
 
-
+    /*---------------------- Loader to get the media files -------------------*/
     @NonNull
     @Override
     public Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
+        // array of the column to get
         String[] projection;
         projection = new String[]{
                 MediaStore.Audio.Media._ID,
@@ -174,7 +180,9 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor audioCursor) {
+        // add the cursor to the list adapter
         mAdapter.swapCursor(audioCursor);
+        // add the files to the list
         int idColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media._ID);
         int titleColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
         int artistColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
@@ -190,10 +198,13 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             int dateAdded = audioCursor.getInt(dateAddedColumn);
             mAudioFiles.add(new AudioFile(id, title, artist, album, albumId, dateAdded));
         }
+        // start the media service
         Intent i = new Intent(this, MediaPlaybackService.class);
+        // send the files to the service
         Parcelable parcelable = Parcels.wrap(mAudioFiles);
         i.putExtra("MediaFiles", parcelable);
         bindService(i, myServiceConnection, BIND_AUTO_CREATE);
+        startService(i);
     }
 
     @Override
