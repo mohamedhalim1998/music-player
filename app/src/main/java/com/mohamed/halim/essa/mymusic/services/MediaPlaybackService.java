@@ -66,6 +66,13 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         mConcatenatingMediaSource = new ConcatenatingMediaSource();
     }
 
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "onStartCommand");
+        //   updateNotification();
+        return START_NOT_STICKY;
+    }
+
     /**
      * Initializes the Media Session to be enabled with media buttons, transport controls, callbacks
      * and media controller.
@@ -150,7 +157,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         // show the notification media control
         Notification notification = NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
                 file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
-        startForeground(0, notification);
+        startForeground(1105, notification);
     }
 
     /**
@@ -227,9 +234,13 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         } else if ((playbackState == ExoPlayer.STATE_READY)) {
             stateBuilder.setState(PlaybackStateCompat.STATE_PAUSED,
                     mExoPlayer.getCurrentPosition(), 1f);
+            Log.d(TAG, "stop foreground");
         }
         mediaSession.setPlaybackState(stateBuilder.build());
         updateNotification();
+        if (!playWhenReady) {
+            stopForeground(false);
+        }
     }
 
     /**
@@ -242,6 +253,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     public void onPositionDiscontinuity(int reason) {
         updateNotification();
     }
+
 
     /**
      * deal with the change in shuffle mode
@@ -282,6 +294,8 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         public void onPause() {
             mCurrentState = false;
             mExoPlayer.setPlayWhenReady(false);
+            stopForeground(false);
+            Log.d(TAG, "stop foreground");
         }
 
         /**
@@ -291,7 +305,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
          */
         @Override
         public void onSkipToPrevious() {
-            if (mExoPlayer.hasPrevious() && mExoPlayer.getCurrentPosition() > 2000) {
+            if (mExoPlayer.hasPrevious() && mExoPlayer.getCurrentPosition() < 2000) {
                 mExoPlayer.previous();
                 updateNotification();
             } else {
@@ -307,9 +321,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         public void onSkipToNext() {
             if (mExoPlayer.hasNext()) {
                 mExoPlayer.next();
-                AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
-                NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
-                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+                updateNotification();
             }
         }
     }
