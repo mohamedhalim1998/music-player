@@ -141,12 +141,16 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         mExoPlayer.addListener(this);
         // set the track to play
         mExoPlayer.seekTo(mCurrentWindowIndex, mCurrentPosition);
+        updateNotification();
+        Log.d(TAG, "initializePlayer: play from service");
+    }
+
+    private void updateNotification() {
         AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
         // show the notification media control
         Notification notification = NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
                 file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
         startForeground(0, notification);
-        Log.d(TAG, "initializePlayer: play from service");
     }
 
     /**
@@ -168,8 +172,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         super.onDestroy();
         releasePlayer();
     }
-
-    /* ---------------------- ExoPlayer.EventListener -------------------*/
+    /* ---------------------- Getter and Setter for field ---------------*/
 
     /**
      * @return exo player object
@@ -177,6 +180,37 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     public SimpleExoPlayer getExoPlayer() {
         return mExoPlayer;
     }
+
+    public int getCurrentWindowIndex() {
+        return mCurrentWindowIndex;
+    }
+
+    public void setCurrentWindowIndex(int currentWindowIndex) {
+        this.mCurrentWindowIndex = currentWindowIndex;
+        mCurrentState = true;
+        mExoPlayer.seekTo(mCurrentWindowIndex, mCurrentPosition);
+        mExoPlayer.setPlayWhenReady(mCurrentState);
+    }
+
+    public long getCurrentPosition() {
+        return mCurrentPosition;
+    }
+
+    public void setCurrentPosition(long currentPosition) {
+        this.mCurrentPosition = currentPosition;
+        mExoPlayer.seekTo(mCurrentWindowIndex, mCurrentPosition);
+
+    }
+
+    public boolean isCurrentState() {
+        return mCurrentState;
+    }
+
+    public void setCurrentState(boolean currentState) {
+        this.mCurrentState = currentState;
+    }
+
+    /* ---------------------- ExoPlayer.EventListener -------------------*/
 
     /**
      * deal with player state change from play to pause and vice versa
@@ -195,9 +229,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
                     mExoPlayer.getCurrentPosition(), 1f);
         }
         mediaSession.setPlaybackState(stateBuilder.build());
-        AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
-        NotificationHelper.showNotification(this, stateBuilder.build(), mediaSession,
-                file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+        updateNotification();
     }
 
     /**
@@ -208,9 +240,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
      */
     @Override
     public void onPositionDiscontinuity(int reason) {
-        AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
-        NotificationHelper.showNotification(this, stateBuilder.build(), mediaSession,
-                file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+        updateNotification();
     }
 
     /**
@@ -263,9 +293,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         public void onSkipToPrevious() {
             if (mExoPlayer.hasPrevious() && mExoPlayer.getCurrentPosition() > 2000) {
                 mExoPlayer.previous();
-                AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
-                NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
-                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+                updateNotification();
             } else {
                 mExoPlayer.seekTo(0);
             }
