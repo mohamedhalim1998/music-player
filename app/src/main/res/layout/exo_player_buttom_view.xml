@@ -4,7 +4,7 @@
     android:layout_height="wrap_content">
     <ImageView android:id="@id/exo_artwork"
         android:layout_width="80dp"
-        android:background="@color/exo_edit_mode_background_color"
+        android:background="#111111"
         android:layout_height="match_parent"
         android:scaleType="fitCenter"/>
 
