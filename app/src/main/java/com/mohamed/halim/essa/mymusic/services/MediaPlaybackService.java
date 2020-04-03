@@ -6,27 +6,18 @@ import android.content.BroadcastReceiver;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.Bundle;
 import android.os.IBinder;
-import android.os.Parcelable;
 import android.provider.MediaStore;
-import android.support.v4.media.MediaBrowserCompat.MediaItem;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.lifecycle.LifecycleOwner;
-import androidx.lifecycle.ViewModelStoreOwner;
-import androidx.loader.app.LoaderManager;
-import androidx.loader.content.CursorLoader;
-import androidx.loader.content.Loader;
-import androidx.media.MediaBrowserServiceCompat;
 import androidx.media.session.MediaButtonReceiver;
+import androidx.preference.PreferenceManager;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
@@ -39,12 +30,10 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 import com.mohamed.halim.essa.mymusic.data.AudioFile;
 import com.mohamed.halim.essa.mymusic.helpers.NotificationHelper;
-import com.mohamed.halim.essa.mymusic.ui.MainActivity;
 
 import org.parceler.Parcels;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public class MediaPlaybackService extends Service implements ExoPlayer.EventListener {
     private static final String TAG = MediaPlaybackService.class.getSimpleName();
@@ -57,6 +46,10 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     private long mCurrentPosition;
     private boolean mCurrentState;
     private ConcatenatingMediaSource mConcatenatingMediaSource;
+    // keys for save the parameters on the exo player
+    public static final String CURRENT_WINDOW_INDEX_KEY = "current-window-index";
+    public static final String CURRENT_POSITION_KEY = "current-position";
+    public static final String CURRENT_STATE_KEY = "current-state";
 
     @Override
     public void onCreate() {
@@ -64,6 +57,12 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         initializeMediaSession();
         // create a ConcatenatingMediaSource to play
         mConcatenatingMediaSource = new ConcatenatingMediaSource();
+        //restore the state of the player
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        mCurrentWindowIndex = sharedPreferences.getInt(CURRENT_WINDOW_INDEX_KEY, 0);
+        mCurrentPosition = sharedPreferences.getLong(CURRENT_POSITION_KEY, 0);
+
+
     }
 
     @Override
@@ -104,9 +103,9 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     public IBinder onBind(Intent intent) {
         mAudioFiles = Parcels.unwrap(intent.getParcelableExtra("MediaFiles"));
         createAllPlayList();
+        startService(intent);
         return new MyBinder();
     }
-
 
     /**
      * build a media source from uri using
@@ -133,7 +132,8 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
             MediaSource mediaSource = buildMediaSource(uri);
             mConcatenatingMediaSource.addMediaSource(mediaSource);
         }
-        releasePlayer();
+        if (mExoPlayer != null)
+            releasePlayer();
         initializePlayer();
         mExoPlayer.prepare(mConcatenatingMediaSource, false, false);
     }
@@ -164,21 +164,31 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
      * release the player if no longer needed
      */
     private void releasePlayer() {
-
         if (mExoPlayer != null) {
-            mCurrentState = mExoPlayer.getPlayWhenReady();
-            mCurrentPosition = mExoPlayer.getCurrentPosition();
-            mCurrentWindowIndex = mExoPlayer.getCurrentWindowIndex();
+            Log.e(TAG, "releasePlayer");
+            updatePreference();
             mExoPlayer.release();
             mExoPlayer = null;
         }
     }
+
+    private void updatePreference() {
+        Log.e(TAG, "updatePreference ");
+        mCurrentState = mExoPlayer.getPlayWhenReady();
+        mCurrentPosition = mExoPlayer.getCurrentPosition();
+        mCurrentWindowIndex = mExoPlayer.getCurrentWindowIndex();
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        sharedPreferences.edit().putLong(CURRENT_POSITION_KEY, mCurrentPosition)
+                .putInt(CURRENT_WINDOW_INDEX_KEY, mCurrentWindowIndex).apply();
+    }
+
 
     @Override
     public void onDestroy() {
         super.onDestroy();
         releasePlayer();
     }
+
     /* ---------------------- Getter and Setter for field ---------------*/
 
     /**
@@ -195,7 +205,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     public void setCurrentWindowIndex(int currentWindowIndex) {
         this.mCurrentWindowIndex = currentWindowIndex;
         mCurrentState = true;
-        mExoPlayer.seekTo(mCurrentWindowIndex, mCurrentPosition);
+        mExoPlayer.seekTo(mCurrentWindowIndex, 0);
         mExoPlayer.setPlayWhenReady(mCurrentState);
     }
 
@@ -240,6 +250,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         updateNotification();
         if (!playWhenReady) {
             stopForeground(false);
+            updatePreference();
         }
     }
 
@@ -295,6 +306,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
             mCurrentState = false;
             mExoPlayer.setPlayWhenReady(false);
             stopForeground(false);
+            updatePreference();
             Log.d(TAG, "stop foreground");
         }
 

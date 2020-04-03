@@ -2,6 +2,7 @@ package com.mohamed.halim.essa.mymusic.adapters;
 
 import android.content.Context;
 import android.database.Cursor;
+import android.os.Build;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -9,6 +10,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.TextView;
+
+import androidx.annotation.RequiresApi;
 
 import com.mohamed.halim.essa.mymusic.R;
 
@@ -54,6 +57,7 @@ public class AudioAdapter extends BaseAdapter {
         return audioCursor.getLong(audioCursor.getColumnIndex(MediaStore.Audio.Media._ID));
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         if (convertView == null) {

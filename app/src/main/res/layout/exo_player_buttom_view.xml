@@ -6,6 +6,7 @@
         android:layout_width="80dp"
         android:background="#111111"
         android:layout_height="match_parent"
+        android:contentDescription="TODO"
         android:scaleType="fitCenter"/>
 
     <View android:id="@id/exo_controller_placeholder"

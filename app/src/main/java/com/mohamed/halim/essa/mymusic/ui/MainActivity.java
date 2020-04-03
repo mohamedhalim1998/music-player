@@ -5,11 +5,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
+import androidx.preference.PreferenceManager;
 
 import android.Manifest;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.media.AudioManager;
@@ -41,10 +43,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private static final String TAG = MainActivity.class.getSimpleName();
     //  loader id for loading the media files
     private static final int LOAD_FILES_LOADER_ID = 1001;
-    // keys for save the parameters on the exo player
-    private static final String CURRENT_WINDOW_INDEX_KEY = "current-window-index";
-    private static final String CURRENT_POSITION_KEY = "current-position";
-    private static final String CURRENT_STATE_KEY = "current-state";
     // List adapter
     private AudioAdapter mAdapter;
     private ListView mAudioListView;
@@ -77,6 +75,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAdapter = new AudioAdapter(this, null);
         mAudioListView = findViewById(R.id.music_list);
         mExoPlayerView = findViewById(R.id.exo_player);
+        mExoPlayerView.showController();
         mAudioListView.setAdapter(mAdapter);
         // create a notification channel
         NotificationHelper.createTaskNotificationChannel(this);
@@ -91,9 +90,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             }
         }
         // start playing if a track clicked
-        mAudioListView.setOnItemClickListener((parent, view, position, id) -> {
-            mMediaPlaybackService.setCurrentWindowIndex(position);
-        });
+        mAudioListView.setOnItemClickListener((parent, view, position, id) -> mMediaPlaybackService.setCurrentWindowIndex(position));
     }
 
     @Override
@@ -116,19 +113,11 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     }
 
     @Override
-    public void onSaveInstanceState(@NonNull Bundle outState, @NonNull PersistableBundle outPersistentState) {
-//        mCurrentState = mExoPlayer.getPlayWhenReady();
-//        mCurrentPosition = mExoPlayer.getCurrentPosition();
-//        mCurrentWindowIndex = mExoPlayer.getCurrentWindowIndex();
-//        outState.putInt(CURRENT_WINDOW_INDEX_KEY, mCurrentWindowIndex);
-//        outState.putLong(CURRENT_POSITION_KEY, mCurrentPosition);
-//        outState.putBoolean(CURRENT_STATE_KEY, mCurrentState);
-    }
-
-    @Override
     protected void onDestroy() {
         super.onDestroy();
+        unbindService(myServiceConnection);
     }
+
 
     /**
      * handle the result of the permission request
@@ -204,7 +193,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         Parcelable parcelable = Parcels.wrap(mAudioFiles);
         i.putExtra("MediaFiles", parcelable);
         bindService(i, myServiceConnection, BIND_AUTO_CREATE);
-        startService(i);
+        //  startService(i);
     }
 
     @Override

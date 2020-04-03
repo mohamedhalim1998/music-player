@@ -42,4 +42,5 @@ dependencies {
     implementation 'com.google.android.exoplayer:exoplayer-dash:2.10.5'
     implementation 'com.google.android.exoplayer:exoplayer-ui:2.10.5'
     annotationProcessor 'org.parceler:parceler:1.1.12'
+    implementation "androidx.preference:preference:1.1.0"
 }

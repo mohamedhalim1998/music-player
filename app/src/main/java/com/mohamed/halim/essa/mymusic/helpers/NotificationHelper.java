@@ -30,7 +30,7 @@ import java.io.IOException;
 
 public class NotificationHelper {
     private static final String TAG = NotificationHelper.class.getSimpleName();
-    private static final String NOTI_CH_ID = "track notification";
+    public static final String NOTI_CH_ID = "track notification";
 
 
     public static void createTaskNotificationChannel(Context c) {
@@ -100,12 +100,11 @@ public class NotificationHelper {
                 .addAction(playPauseAction)
                 .addAction(nextAction)
                 .setAutoCancel(false)
-                .setOngoing(true)
                 .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
                         .setMediaSession(mediaSession.getSessionToken())
                         .setShowActionsInCompactView(0, 1));
-        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
-        notificationManager.notify(0, builder.build());
+//        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
+//        notificationManager.notify(0, builder.build());
         return builder.build();
     }
 

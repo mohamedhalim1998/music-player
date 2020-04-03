@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">My Music</string>
+    <string name="album_art_decs">This the art work for the album</string>
 </resources>
