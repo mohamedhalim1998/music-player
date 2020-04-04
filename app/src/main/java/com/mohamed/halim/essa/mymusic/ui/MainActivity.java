@@ -2,6 +2,7 @@ package com.mohamed.halim.essa.mymusic.ui;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SearchView;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
@@ -21,7 +22,10 @@ import android.os.IBinder;
 import android.os.Parcelable;
 import android.os.PersistableBundle;
 import android.provider.MediaStore;
+import android.text.TextUtils;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ListView;
 
 import com.google.android.exoplayer2.ExoPlayer;
@@ -47,10 +51,12 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private AudioAdapter mAdapter;
     private ListView mAudioListView;
     private PlayerView mExoPlayerView;
+    private SearchView searchView;
     // list of all the audio files
     private ArrayList<AudioFile> mAudioFiles;
     // instance of a MediaPlaybackService
     MediaPlaybackService mMediaPlaybackService;
+
     // connection to the service
     private ServiceConnection myServiceConnection = new ServiceConnection() {
         @Override
@@ -75,6 +81,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAdapter = new AudioAdapter(this, null);
         mAudioListView = findViewById(R.id.music_list);
         mExoPlayerView = findViewById(R.id.exo_player);
+        searchView = findViewById(R.id.track_search_bar);
         mExoPlayerView.showController();
         mAudioListView.setAdapter(mAdapter);
         // create a notification channel
@@ -90,7 +97,34 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             }
         }
         // start playing if a track clicked
-        mAudioListView.setOnItemClickListener((parent, view, position, id) -> mMediaPlaybackService.setCurrentWindowIndex(position));
+        mAudioListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                mMediaPlaybackService.changeTrack(id);
+            }
+        });
+
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                if (TextUtils.isEmpty(query)) {
+                    mAdapter.swapList(mAudioFiles);
+                } else {
+                    mAdapter.getFilter().filter(query);
+                }
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String query) {
+                if (TextUtils.isEmpty(query)) {
+                    mAdapter.swapList(mAudioFiles);
+                } else {
+                    mAdapter.getFilter().filter(query);
+                }
+                return false;
+            }
+        });
     }
 
     @Override
@@ -169,8 +203,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor audioCursor) {
-        // add the cursor to the list adapter
-        mAdapter.swapCursor(audioCursor);
         // add the files to the list
         int idColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media._ID);
         int titleColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
@@ -178,6 +210,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         int albumColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ALBUM);
         int albumIdColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID);
         int dateAddedColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED);
+        int durationColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.DURATION);
         while (audioCursor.moveToNext()) {
             int id = audioCursor.getInt(idColumn);
             String title = audioCursor.getString(titleColumn);
@@ -185,8 +218,10 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             String album = audioCursor.getString(albumColumn);
             int albumId = audioCursor.getInt(albumIdColumn);
             int dateAdded = audioCursor.getInt(dateAddedColumn);
-            mAudioFiles.add(new AudioFile(id, title, artist, album, albumId, dateAdded));
+            long duration = audioCursor.getLong(durationColumn);
+            mAudioFiles.add(new AudioFile(id, title, artist, album, albumId, dateAdded, duration));
         }
+        mAdapter.swapList(mAudioFiles);
         // start the media service
         Intent i = new Intent(this, MediaPlaybackService.class);
         // send the files to the service
@@ -198,7 +233,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     @Override
     public void onLoaderReset(@NonNull Loader<Cursor> loader) {
-        mAdapter.swapCursor(null);
+        mAdapter.swapList(null);
     }
 
 }

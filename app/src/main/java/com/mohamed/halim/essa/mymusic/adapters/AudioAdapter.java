@@ -9,73 +9,68 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.TextView;
 
 import androidx.annotation.RequiresApi;
 
 import com.mohamed.halim.essa.mymusic.R;
+import com.mohamed.halim.essa.mymusic.data.AudioFile;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
-public class AudioAdapter extends BaseAdapter {
+public class AudioAdapter extends BaseAdapter implements Filterable {
     private Context context;
-    private Cursor audioCursor;
+    private List<AudioFile> audioFiles;
+    private List<AudioFile> originalFiles;
     private static final String TAG = AudioAdapter.class.getSimpleName();
 
-    public AudioAdapter(Context context, Cursor audioCursor) {
+    public AudioAdapter(Context context, List<AudioFile> audioFiles) {
+        this.originalFiles = audioFiles;
         this.context = context;
-        this.audioCursor = audioCursor;
     }
 
 
-    public void swapCursor(Cursor newCursor) {
-        audioCursor = newCursor;
+    public void swapList(List<AudioFile> audioFiles) {
+        this.originalFiles = audioFiles;
+        if (originalFiles != null)
+            this.audioFiles = new ArrayList<>(originalFiles);
         notifyDataSetChanged();
     }
 
-    public Cursor getAudioCursor() {
-        return audioCursor;
-    }
 
     @Override
     public int getCount() {
-        if (audioCursor != null)
-            return audioCursor.getCount();
+        if (audioFiles != null)
+            return audioFiles.size();
         return 0;
     }
 
     @Override
     public Object getItem(int position) {
-        return audioCursor.moveToPosition(position);
+        return audioFiles.get(position);
     }
 
     @Override
     public long getItemId(int position) {
-        audioCursor.moveToPosition(position);
-        return audioCursor.getLong(audioCursor.getColumnIndex(MediaStore.Audio.Media._ID));
+        return audioFiles.get(position).getId();
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.Q)
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         if (convertView == null) {
             convertView = LayoutInflater.from(context).inflate(R.layout.audio_list_item, parent, false);
         }
-        int titleColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
-        int artistColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
-        int albumColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ALBUM);
-        int albumIdColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID);
-        int dataAddedColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED);
-        int durationColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.DURATION);
-        audioCursor.moveToPosition(position);
-        String title = audioCursor.getString(titleColumn);
-        String artist = audioCursor.getString(artistColumn);
-        String album = audioCursor.getString(albumColumn);
-        int albumId = audioCursor.getInt(albumIdColumn);
-        long dataAdded = audioCursor.getLong(dataAddedColumn);
-        long duration = audioCursor.getLong(durationColumn);
+        AudioFile currentTrack = audioFiles.get(position);
+        String title = currentTrack.getTitle();
+        String artist = currentTrack.getArtist();
+        String album = currentTrack.getAlbum();
+        int albumId = currentTrack.getAlbumId();
+        long dataAdded = currentTrack.getDateAdded();
+        long duration = currentTrack.getDuration();
         TextView titleTextView = convertView.findViewById(R.id.title_tv);
         TextView artistTextView = convertView.findViewById(R.id.album_artist_tv);
         TextView durationTextView = convertView.findViewById(R.id.duration_tv);
@@ -85,6 +80,12 @@ public class AudioAdapter extends BaseAdapter {
         return convertView;
     }
 
+    /**
+     * format the duration to HH:mm:ss
+     *
+     * @param duration : of the track
+     * @return formatted duration
+     */
     private String formatDuration(long duration) {
         long seconds = duration / 1000;
         long min = seconds / 60;
@@ -94,7 +95,35 @@ public class AudioAdapter extends BaseAdapter {
         if (hours != 0)
             return String.format(Locale.getDefault(), "%d:%02d:%02d", hours, min, seconds);
         else
-            return String.format(Locale.getDefault(), "%02d:%02d", min, seconds);
+            return String.format(Locale.getDefault(), "%d:%02d", min, seconds);
 
+    }
+
+    @Override
+    public Filter getFilter() {
+        return new Filter() {
+            @Override
+            protected FilterResults performFiltering(CharSequence constraint) {
+                constraint = constraint.toString().toLowerCase();
+                FilterResults filterResults = new FilterResults();
+                List<AudioFile> filtered = new ArrayList<>();
+                audioFiles = new ArrayList<>(originalFiles);
+                for (AudioFile f : audioFiles) {
+                    if (f.getAlbum().toLowerCase().contains(constraint)
+                            || f.getArtist().toLowerCase().contains(constraint)
+                            || f.getTitle().toLowerCase().contains(constraint)) {
+                        filtered.add(f);
+                    }
+                }
+                filterResults.values = filtered;
+                return filterResults;
+            }
+
+            @Override
+            protected void publishResults(CharSequence constraint, FilterResults results) {
+                audioFiles = (List<AudioFile>) results.values;
+                notifyDataSetChanged();
+            }
+        };
     }
 }

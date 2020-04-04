@@ -11,15 +11,17 @@ public class AudioFile {
     String album;
     int albumId;
     int dateAdded;
+    long duration;
 
     @ParcelConstructor
-    public AudioFile(int id, String title, String artist, String album, int albumId, int dateAdded) {
+    public AudioFile(int id, String title, String artist, String album, int albumId, int dateAdded, long duration) {
         this.id = id;
         this.title = title;
         this.artist = artist;
         this.album = album;
         this.albumId = albumId;
         this.dateAdded = dateAdded;
+        this.duration = duration;
     }
 
     public int getDateAdded() {
@@ -44,5 +46,9 @@ public class AudioFile {
 
     public int getAlbumId() {
         return albumId;
+    }
+
+    public long getDuration() {
+        return duration;
     }
 }

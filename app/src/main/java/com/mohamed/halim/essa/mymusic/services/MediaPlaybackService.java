@@ -172,6 +172,9 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         }
     }
 
+    /**
+     * update the player state in the preference
+     */
     private void updatePreference() {
         Log.e(TAG, "updatePreference ");
         mCurrentState = mExoPlayer.getPlayWhenReady();
@@ -182,6 +185,18 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
                 .putInt(CURRENT_WINDOW_INDEX_KEY, mCurrentWindowIndex).apply();
     }
 
+    /**
+     * update the playing track
+     *
+     * @param id : of the desired track
+     */
+    public void changeTrack(long id) {
+        for (int i = 0; i < mAudioFiles.size(); i++) {
+            if (mAudioFiles.get(i).getId() == id) {
+                setCurrentWindowIndex(i);
+            }
+        }
+    }
 
     @Override
     public void onDestroy() {

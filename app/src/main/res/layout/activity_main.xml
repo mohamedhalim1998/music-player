@@ -9,7 +9,7 @@
     tools:context=".ui.MainActivity"
     tools:ignore="Overdraw">
     <androidx.appcompat.widget.SearchView
-        android:id="@+id/search_bar"
+        android:id="@+id/track_search_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
     <ListView
