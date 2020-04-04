@@ -30,12 +30,13 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 import com.mohamed.halim.essa.mymusic.data.AudioFile;
 import com.mohamed.halim.essa.mymusic.helpers.NotificationHelper;
+import com.mohamed.halim.essa.mymusic.ui.MainActivity;
 
 import org.parceler.Parcels;
 
 import java.util.ArrayList;
 
-public class MediaPlaybackService extends Service implements ExoPlayer.EventListener {
+public class MediaPlaybackService extends Service implements ExoPlayer.EventListener, SharedPreferences.OnSharedPreferenceChangeListener {
     private static final String TAG = MediaPlaybackService.class.getSimpleName();
     // media state vars
     private static MediaSessionCompat mediaSession;
@@ -61,8 +62,6 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         mCurrentWindowIndex = sharedPreferences.getInt(CURRENT_WINDOW_INDEX_KEY, 0);
         mCurrentPosition = sharedPreferences.getLong(CURRENT_POSITION_KEY, 0);
-
-
     }
 
     @Override
@@ -89,6 +88,8 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
                                 PlaybackStateCompat.ACTION_PAUSE |
                                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
                                 PlaybackStateCompat.ACTION_SKIP_TO_NEXT |
+                                PlaybackStateCompat.ACTION_FAST_FORWARD |
+                                PlaybackStateCompat.ACTION_REWIND |
                                 PlaybackStateCompat.ACTION_PLAY_PAUSE);
 
         mediaSession.setPlaybackState(stateBuilder.build());
@@ -103,6 +104,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     public IBinder onBind(Intent intent) {
         mAudioFiles = Parcels.unwrap(intent.getParcelableExtra("MediaFiles"));
         createAllPlayList();
+        PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).registerOnSharedPreferenceChangeListener(this);
         startService(intent);
         return new MyBinder();
     }
@@ -153,10 +155,16 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     }
 
     private void updateNotification() {
+
         AudioFile file = mAudioFiles.get(mExoPlayer.getCurrentWindowIndex());
         // show the notification media control
-        Notification notification = NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
-                file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
+        boolean podcastMode = PreferenceManager.getDefaultSharedPreferences(getApplicationContext())
+                .getBoolean(MainActivity.PODCAST_MODE_ENABLED_KEY, false);
+
+        Notification notification = !podcastMode ? NotificationHelper.showNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
+                file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId()) :
+                NotificationHelper.showPodcastNotification(getApplicationContext(), stateBuilder.build(), mediaSession,
+                        file.getTitle(), file.getArtist(), file.getAlbum(), file.getAlbumId());
         startForeground(1105, notification);
     }
 
@@ -202,6 +210,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     public void onDestroy() {
         super.onDestroy();
         releasePlayer();
+        PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).unregisterOnSharedPreferenceChangeListener(this);
     }
 
     /* ---------------------- Getter and Setter for field ---------------*/
@@ -301,6 +310,15 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         mExoPlayer.setRepeatMode(repeatMode);
     }
 
+    /* ------------------- shared preference change --------------------*/
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        if (key.equals(MainActivity.PODCAST_MODE_ENABLED_KEY)) {
+            updateNotification();
+        }
+        Log.e(TAG, "onSharedPreferenceChanged");
+    }
+
     /* ----------------- inner classes ------------------*/
     // inner class for MediaSession callback
     private class MySessionCallback extends MediaSessionCompat.Callback {
@@ -350,6 +368,16 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
                 mExoPlayer.next();
                 updateNotification();
             }
+        }
+
+        @Override
+        public void onRewind() {
+            mExoPlayer.seekTo(mExoPlayer.getCurrentPosition() - 15000);
+        }
+
+        @Override
+        public void onFastForward() {
+            mExoPlayer.seekTo(mExoPlayer.getCurrentPosition() + 15000);
         }
     }
 

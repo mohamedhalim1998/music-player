@@ -24,9 +24,15 @@ import android.os.PersistableBundle;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ListView;
+import android.widget.Toast;
+import android.widget.ViewSwitcher;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ui.PlayerView;
@@ -43,6 +49,8 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>, ExoPlayer.EventListener {
     // permission code
     private static final int READ_EXTERNAL_STORAGE_REQUEST_CODE = 120;
+    // key for podcast shared preference
+    public static final String PODCAST_MODE_ENABLED_KEY = "podcast-mode-enabled";
     // log tag
     private static final String TAG = MainActivity.class.getSimpleName();
     //  loader id for loading the media files
@@ -51,12 +59,14 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     private AudioAdapter mAdapter;
     private ListView mAudioListView;
     private PlayerView mExoPlayerView;
+    private PlayerView mExoPlayerPodcastView;
     private SearchView searchView;
+    private ViewSwitcher viewSwitcher;
     // list of all the audio files
     private ArrayList<AudioFile> mAudioFiles;
     // instance of a MediaPlaybackService
     MediaPlaybackService mMediaPlaybackService;
-
+    private boolean mPodcastMode;
     // connection to the service
     private ServiceConnection myServiceConnection = new ServiceConnection() {
         @Override
@@ -64,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             mMediaPlaybackService = ((MediaPlaybackService.MyBinder) binder).getService();
             Log.d(TAG, "onServiceConnected: service initialize");
             mExoPlayerView.setPlayer(mMediaPlaybackService.getExoPlayer());
+            mExoPlayerPodcastView.setPlayer(mMediaPlaybackService.getExoPlayer());
         }
 
         @Override
@@ -81,11 +92,22 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAdapter = new AudioAdapter(this, null);
         mAudioListView = findViewById(R.id.music_list);
         mExoPlayerView = findViewById(R.id.exo_player);
+        mExoPlayerPodcastView = findViewById(R.id.exo_player_podcast);
         searchView = findViewById(R.id.track_search_bar);
+        viewSwitcher = findViewById(R.id.mode_view_switcher);
         mExoPlayerView.showController();
+        mExoPlayerPodcastView.showController();
         mAudioListView.setAdapter(mAdapter);
         // create a notification channel
         NotificationHelper.createTaskNotificationChannel(this);
+        // save a podcast mode in sharedpreference
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        if (!sharedPreferences.contains(PODCAST_MODE_ENABLED_KEY)) {
+            sharedPreferences.edit().putBoolean(PODCAST_MODE_ENABLED_KEY, false).apply();
+            mPodcastMode = false;
+        } else {
+            mPodcastMode = sharedPreferences.getBoolean(PODCAST_MODE_ENABLED_KEY, false);
+        }
         // check the permission for sdk > M
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
@@ -103,7 +125,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 mMediaPlaybackService.changeTrack(id);
             }
         });
-
+        // create the search query
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -125,7 +147,11 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 return false;
             }
         });
+        if (mPodcastMode) {
+            viewSwitcher.showNext();
+        }
     }
+
 
     @Override
     protected void onResume() {
@@ -175,6 +201,39 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         } else {
             Log.e(TAG, "onRequestPermissionsResult: no such request code" + requestCode);
         }
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem item = menu.findItem(R.id.podcast_mode_action);
+        int title = mPodcastMode ? R.string.podcast_mode_action_name_disable : R.string.podcast_mode_action_name_enable;
+        item.setTitle(title);
+        return true;
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+        switch (id) {
+            case R.id.podcast_mode_action:
+                viewSwitcher.showNext();
+                SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+                mPodcastMode = !mPodcastMode;
+                sharedPreferences.edit().putBoolean(PODCAST_MODE_ENABLED_KEY, mPodcastMode).apply();
+                int title = mPodcastMode ? R.string.podcast_mode_action_name_disable : R.string.podcast_mode_action_name_enable;
+                item.setTitle(title);
+                return true;
+        }
+
+
+        return super.onOptionsItemSelected(item);
     }
 
     /*---------------------- Loader to get the media files -------------------*/

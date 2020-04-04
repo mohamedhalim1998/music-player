@@ -4,34 +4,55 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@drawable/background"
+    android:orientation="vertical"
     tools:context=".ui.MainActivity"
     tools:ignore="Overdraw">
+
     <androidx.appcompat.widget.SearchView
         android:id="@+id/track_search_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content" />
+
     <ListView
         android:id="@+id/music_list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="4" />
+
     <View
         android:layout_width="match_parent"
         android:layout_height="2dp"
-        android:background="@color/colorAccent"/>
-    <com.google.android.exoplayer2.ui.PlayerView
-        android:visibility="visible"
-        android:id="@+id/exo_player"
-        app:show_timeout="0"
-        app:hide_on_touch="false"
-        app:controller_layout_id="@layout/exo_player_control_buttom_view"
-        app:default_artwork="@drawable/music_art_place_holder"
-        app:player_layout_id="@layout/exo_player_buttom_view"
-        app:repeat_toggle_modes="one"
-        app:show_shuffle_button="true"
+        android:background="#111111" />
+
+    <ViewSwitcher
+        android:id="@+id/mode_view_switcher"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content">
+
+        <com.google.android.exoplayer2.ui.PlayerView
+            android:id="@+id/exo_player"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="visible"
+            app:controller_layout_id="@layout/exo_player_control_buttom_view"
+            app:default_artwork="@drawable/music_art_place_holder"
+            app:hide_on_touch="false"
+            app:player_layout_id="@layout/exo_player_buttom_view"
+            app:repeat_toggle_modes="one"
+            app:show_shuffle_button="true"
+            app:show_timeout="0" />
+
+        <com.google.android.exoplayer2.ui.PlayerView
+            android:id="@+id/exo_player_podcast"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="visible"
+            app:controller_layout_id="@layout/exo_player_buttom_podcast_control"
+            app:default_artwork="@drawable/music_art_place_holder"
+            app:hide_on_touch="false"
+            app:player_layout_id="@layout/exo_player_buttom_view"
+            app:show_timeout="0" />
+    </ViewSwitcher>
 
 </LinearLayout>

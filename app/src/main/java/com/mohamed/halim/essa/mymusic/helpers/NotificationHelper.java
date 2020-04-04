@@ -42,10 +42,6 @@ public class NotificationHelper {
                     .setLegacyStreamType(AudioManager.STREAM_NOTIFICATION)
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT).build();
             Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-
-            channel.setSound(sound, attributes);
-
-            channel.enableVibration(true);
             NotificationManager manager = c.getSystemService(NotificationManager.class);
             manager.createNotificationChannel(channel);
         }
@@ -103,8 +99,6 @@ public class NotificationHelper {
                 .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
                         .setMediaSession(mediaSession.getSessionToken())
                         .setShowActionsInCompactView(0, 1));
-//        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
-//        notificationManager.notify(0, builder.build());
         return builder.build();
     }
 
@@ -115,7 +109,6 @@ public class NotificationHelper {
         try {
             bitmap = MediaStore.Images.Media.getBitmap(
                     context.getContentResolver(), albumArtUri);
-
         } catch (FileNotFoundException exception) {
             exception.printStackTrace();
             bitmap = BitmapFactory.decodeResource(context.getResources(),
@@ -125,7 +118,61 @@ public class NotificationHelper {
             e.printStackTrace();
         }
         return bitmap;
+    }
 
+    /**
+     * Shows Media Style notification, with an action that depends on the current MediaSession
+     * PlaybackState.
+     *
+     * @param state The PlaybackState of the MediaSession.
+     * @return notification
+     */
+    public static Notification showPodcastNotification(Context context, PlaybackStateCompat state, MediaSessionCompat mediaSession,
+                                                       String title, String artist, String album, int albumId) {
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, NotificationHelper.NOTI_CH_ID);
+        int icon;
+        String play_pause;
+        if (state.getState() == PlaybackStateCompat.STATE_PLAYING) {
+            icon = R.drawable.exo_controls_pause;
+            play_pause = "pause";
+        } else {
+            icon = R.drawable.exo_controls_play;
+            play_pause = "play";
+        }
+
+
+        NotificationCompat.Action playPauseAction = new NotificationCompat.Action(
+                icon, play_pause,
+                MediaButtonReceiver.buildMediaButtonPendingIntent(context,
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE));
+
+        NotificationCompat.Action restartAction = new NotificationCompat
+                .Action(R.drawable.exo_icon_rewind, "rewind",
+                MediaButtonReceiver.buildMediaButtonPendingIntent
+                        (context, PlaybackStateCompat.ACTION_REWIND));
+        NotificationCompat.Action nextAction = new NotificationCompat
+                .Action(R.drawable.exo_icon_fastforward, "fastForward",
+                MediaButtonReceiver.buildMediaButtonPendingIntent
+                        (context, PlaybackStateCompat.ACTION_FAST_FORWARD));
+
+        PendingIntent contentPendingIntent = PendingIntent.getActivity
+                (context, 0, new Intent(context, MainActivity.class), 0);
+
+        Bitmap largeIcon = createAlbumArt(context, albumId);
+        builder.setContentTitle(title)
+                .setContentText(artist + " - " + album)
+                .setContentIntent(contentPendingIntent)
+                .setSmallIcon(R.drawable.music_art_place_holder)
+                .setLargeIcon(largeIcon)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .addAction(restartAction)
+                .addAction(playPauseAction)
+                .addAction(nextAction)
+                .setAutoCancel(false)
+                .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
+                        .setMediaSession(mediaSession.getSessionToken())
+                        .setShowActionsInCompactView(0, 1));
+        return builder.build();
     }
 
 
