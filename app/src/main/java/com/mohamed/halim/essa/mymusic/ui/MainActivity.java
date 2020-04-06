@@ -235,17 +235,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 item.setTitle(title);
                 return true;
             case R.id.enable_timer_action:
-//                long alarmTime = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(1);
-//                Log.e(TAG, "timer is on " + new SimpleDateFormat("HH:mm:ss").format(new Date(alarmTime)));
-//                mMediaPlaybackService.setTimer(1);
-                TimerDialog timerDialog = new TimerDialog(new TimerDialog.TimerDialogListener() {
-                    @Override
-                    public void onSetTime(int time) {
-                        long alarmTime = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(time);
-                        Log.e(TAG, "timer is on " + new SimpleDateFormat("HH:mm:ss").format(new Date(alarmTime)));
-                        mMediaPlaybackService.setTimer(time);
-                    }
-                });
+                TimerDialog timerDialog = new TimerDialog(time -> mMediaPlaybackService.setTimer(time));
                 timerDialog.show(getSupportFragmentManager(), "Timer Dialog");
                 return true;
         }

@@ -53,7 +53,6 @@ public class TimerDialog extends AppCompatDialogFragment {
                         case R.id.timer_custom:
 
                             try {
-                                Log.e(TAG, "onCreateDialog" + customTime.getText().toString());
                                 time = Integer.valueOf(customTime.getText().toString());
                             } catch (NumberFormatException nfe) {
                                 dialog.dismiss();
@@ -64,8 +63,6 @@ public class TimerDialog extends AppCompatDialogFragment {
                             dialog.dismiss();
                             return;
                     }
-                    Log.e(TAG, "onCreateDialog" + customTime.getText().toString());
-                    Log.e(TAG, "onCreateDialog: " + time);
                     timerDialogListener.onSetTime(time);
                 });
         return dialogBuilder.create();

@@ -177,7 +177,6 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
      */
     private void releasePlayer() {
         if (mExoPlayer != null) {
-            Log.e(TAG, "releasePlayer");
             updatePreference();
             mExoPlayer.release();
             mExoPlayer = null;
@@ -188,7 +187,6 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
      * update the player state in the preference
      */
     private void updatePreference() {
-        Log.e(TAG, "updatePreference ");
         mCurrentState = mExoPlayer.getPlayWhenReady();
         mCurrentPosition = mExoPlayer.getCurrentPosition();
         mCurrentWindowIndex = mExoPlayer.getCurrentWindowIndex();
@@ -222,12 +220,10 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
                 mExoPlayer.setPlayWhenReady(false);
                 stopForeground(true);
                 updatePreference();
-                Log.e(TAG, "timer up");
             }
 
             @Override
             public boolean cancel() {
-                Log.e(TAG, "cancel: " + min);
                 return super.cancel();
             }
         };
@@ -344,7 +340,6 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         if (key.equals(MainActivity.PODCAST_MODE_ENABLED_KEY)) {
             updateNotification();
         }
-        Log.e(TAG, "onSharedPreferenceChanged");
     }
 
     /* ----------------- inner classes ------------------*/
