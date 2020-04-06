@@ -3,6 +3,15 @@
     <string name="album_art_decs">This the art work for the album</string>
     <string name="podcast_mode_action_name_enable">Enable PodCast Mode</string>
     <string name="podcast_mode_action_name_disable">Disable PodCast Mode</string>
+    <string name="enable_timer">Enable Timer</string>
+    <string name="_15_min_timer">15 Min</string>
+    <string name="_30_min_timer">30 Min</string>
+    <string name="_1_hour">1 Hour</string>
+    <string name="timer_custom">Custom</string>
+    <string name="timer_dialog_title">Set Timer</string>
+    <string name="timer_dialog_neg">Cancel</string>
+    <string name="timer_dialog_pos">OK</string>
+    <string name="time_in_minutes">Time in minutes</string>
 
 
 </resources>

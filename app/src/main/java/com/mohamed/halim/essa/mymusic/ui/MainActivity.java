@@ -20,18 +20,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Parcelable;
-import android.os.PersistableBundle;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ListView;
-import android.widget.Toast;
 import android.widget.ViewSwitcher;
 
 import com.google.android.exoplayer2.ExoPlayer;
@@ -44,7 +40,10 @@ import com.mohamed.halim.essa.mymusic.services.MediaPlaybackService;
 
 import org.parceler.Parcels;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>, ExoPlayer.EventListener {
     // permission code
@@ -65,9 +64,10 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     // list of all the audio files
     private ArrayList<AudioFile> mAudioFiles;
     // instance of a MediaPlaybackService
-    MediaPlaybackService mMediaPlaybackService;
+    private MediaPlaybackService mMediaPlaybackService;
     private boolean mPodcastMode;
     // connection to the service
+//    private TimerReceiver mTimerReceiver;
     private ServiceConnection myServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder binder) {
@@ -89,6 +89,10 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         setContentView(R.layout.activity_main);
         // initialize views and adapter
         mAudioFiles = new ArrayList<>();
+//        mTimerReceiver = new TimerReceiver();
+//        IntentFilter intentFilter = new IntentFilter();
+//        intentFilter.addAction(Intent.ACTION_TIME_TICK);
+//        registerReceiver(mTimerReceiver, intentFilter);
         mAdapter = new AudioAdapter(this, null);
         mAudioListView = findViewById(R.id.music_list);
         mExoPlayerView = findViewById(R.id.exo_player);
@@ -229,6 +233,20 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 sharedPreferences.edit().putBoolean(PODCAST_MODE_ENABLED_KEY, mPodcastMode).apply();
                 int title = mPodcastMode ? R.string.podcast_mode_action_name_disable : R.string.podcast_mode_action_name_enable;
                 item.setTitle(title);
+                return true;
+            case R.id.enable_timer_action:
+//                long alarmTime = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(1);
+//                Log.e(TAG, "timer is on " + new SimpleDateFormat("HH:mm:ss").format(new Date(alarmTime)));
+//                mMediaPlaybackService.setTimer(1);
+                TimerDialog timerDialog = new TimerDialog(new TimerDialog.TimerDialogListener() {
+                    @Override
+                    public void onSetTime(int time) {
+                        long alarmTime = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(time);
+                        Log.e(TAG, "timer is on " + new SimpleDateFormat("HH:mm:ss").format(new Date(alarmTime)));
+                        mMediaPlaybackService.setTimer(time);
+                    }
+                });
+                timerDialog.show(getSupportFragmentManager(), "Timer Dialog");
                 return true;
         }
 

@@ -35,6 +35,9 @@ import com.mohamed.halim.essa.mymusic.ui.MainActivity;
 import org.parceler.Parcels;
 
 import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 
 public class MediaPlaybackService extends Service implements ExoPlayer.EventListener, SharedPreferences.OnSharedPreferenceChangeListener {
     private static final String TAG = MediaPlaybackService.class.getSimpleName();
@@ -51,6 +54,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
     public static final String CURRENT_WINDOW_INDEX_KEY = "current-window-index";
     public static final String CURRENT_POSITION_KEY = "current-position";
     public static final String CURRENT_STATE_KEY = "current-state";
+    private TimerTask timerTask;
 
     @Override
     public void onCreate() {
@@ -204,6 +208,30 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
                 setCurrentWindowIndex(i);
             }
         }
+        mExoPlayer.setPlayWhenReady(true);
+    }
+
+    public void setTimer(int min) {
+        Timer timer = new Timer();
+        if (timerTask != null) {
+            timerTask.cancel();
+        }
+        timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                mExoPlayer.setPlayWhenReady(false);
+                stopForeground(true);
+                updatePreference();
+                Log.e(TAG, "timer up");
+            }
+
+            @Override
+            public boolean cancel() {
+                Log.e(TAG, "cancel: " + min);
+                return super.cancel();
+            }
+        };
+        timer.schedule(timerTask, TimeUnit.MINUTES.toMillis(min));
     }
 
     @Override
@@ -230,7 +258,7 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
         this.mCurrentWindowIndex = currentWindowIndex;
         mCurrentState = true;
         mExoPlayer.seekTo(mCurrentWindowIndex, 0);
-        mExoPlayer.setPlayWhenReady(mCurrentState);
+        mExoPlayer.setPlayWhenReady(true);
     }
 
     public long getCurrentPosition() {
