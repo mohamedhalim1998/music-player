@@ -19,9 +19,11 @@ import androidx.annotation.Nullable;
 import androidx.media.session.MediaButtonReceiver;
 import androidx.preference.PreferenceManager;
 
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
@@ -149,11 +151,16 @@ public class MediaPlaybackService extends Service implements ExoPlayer.EventList
      */
     private void initializePlayer() {
         mExoPlayer = ExoPlayerFactory.newSimpleInstance(this);
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.CONTENT_TYPE_MUSIC)
+                .build();
         mExoPlayer.setPlayWhenReady(mCurrentState);
         // add an event listener
         mExoPlayer.addListener(this);
         // set the track to play
         mExoPlayer.seekTo(mCurrentWindowIndex, mCurrentPosition);
+        mExoPlayer.setAudioAttributes(audioAttributes, true);
         updateNotification();
         Log.d(TAG, "initializePlayer: play from service");
     }
