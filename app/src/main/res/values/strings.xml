@@ -12,6 +12,8 @@
     <string name="timer_dialog_neg">Cancel</string>
     <string name="timer_dialog_pos">OK</string>
     <string name="time_in_minutes">Time in minutes</string>
+    <string name="sort_by_date_added">Sort by Date Added</string>
+    <string name="sort_by_name">Sort by Name</string>
 
 
 </resources>

@@ -1,7 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-<item android:id="@+id/podcast_mode_action"
-    android:title="@string/podcast_mode_action_name_enable"/>
-    <item android:id="@+id/enable_timer_action"
-        android:title="@string/enable_timer"/>
+    <item
+        android:id="@+id/podcast_mode_action"
+        android:title="@string/podcast_mode_action_name_enable" />
+    <item
+        android:id="@+id/enable_timer_action"
+        android:title="@string/enable_timer" />
+
+    <item
+        android:id="@+id/sort_date_added_action"
+        android:title="@string/sort_by_date_added" />
+
+    <item
+        android:id="@+id/sort_by_name_action"
+        android:title="@string/sort_by_name" />
 </menu>

@@ -48,8 +48,9 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>, ExoPlayer.EventListener {
     // permission code
     private static final int READ_EXTERNAL_STORAGE_REQUEST_CODE = 120;
-    // key for podcast shared preference
+    // key for shared preference
     public static final String PODCAST_MODE_ENABLED_KEY = "podcast-mode-enabled";
+    public static final String CURRENT_SORT_OPTION_KEY = "current-sort-option";
     // log tag
     private static final String TAG = MainActivity.class.getSimpleName();
     //  loader id for loading the media files
@@ -66,6 +67,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     // instance of a MediaPlaybackService
     private MediaPlaybackService mMediaPlaybackService;
     private boolean mPodcastMode;
+    private String mSortOption;
     // connection to the service
 //    private TimerReceiver mTimerReceiver;
     private ServiceConnection myServiceConnection = new ServiceConnection() {
@@ -89,10 +91,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         setContentView(R.layout.activity_main);
         // initialize views and adapter
         mAudioFiles = new ArrayList<>();
-//        mTimerReceiver = new TimerReceiver();
-//        IntentFilter intentFilter = new IntentFilter();
-//        intentFilter.addAction(Intent.ACTION_TIME_TICK);
-//        registerReceiver(mTimerReceiver, intentFilter);
         mAdapter = new AudioAdapter(this, null);
         mAudioListView = findViewById(R.id.music_list);
         mExoPlayerView = findViewById(R.id.exo_player);
@@ -104,7 +102,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         mAudioListView.setAdapter(mAdapter);
         // create a notification channel
         NotificationHelper.createTaskNotificationChannel(this);
-        // save a podcast mode in sharedpreference
+        // get the initial values from SharedPreferences
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         if (!sharedPreferences.contains(PODCAST_MODE_ENABLED_KEY)) {
             sharedPreferences.edit().putBoolean(PODCAST_MODE_ENABLED_KEY, false).apply();
@@ -112,6 +110,13 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         } else {
             mPodcastMode = sharedPreferences.getBoolean(PODCAST_MODE_ENABLED_KEY, false);
         }
+        if (!sharedPreferences.contains(CURRENT_SORT_OPTION_KEY)) {
+            sharedPreferences.edit().putString(CURRENT_SORT_OPTION_KEY, MediaStore.Video.Media.TITLE).apply();
+            mSortOption = MediaStore.Video.Media.TITLE;
+        } else {
+            mSortOption = sharedPreferences.getString(CURRENT_SORT_OPTION_KEY, MediaStore.Video.Media.TITLE);
+        }
+
         // check the permission for sdk > M
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
@@ -225,10 +230,10 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         switch (id) {
             case R.id.podcast_mode_action:
                 viewSwitcher.showNext();
-                SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
                 mPodcastMode = !mPodcastMode;
                 sharedPreferences.edit().putBoolean(PODCAST_MODE_ENABLED_KEY, mPodcastMode).apply();
                 int title = mPodcastMode ? R.string.podcast_mode_action_name_disable : R.string.podcast_mode_action_name_enable;
@@ -238,9 +243,19 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 TimerDialog timerDialog = new TimerDialog(time -> mMediaPlaybackService.setTimer(time));
                 timerDialog.show(getSupportFragmentManager(), "Timer Dialog");
                 return true;
+            case R.id.sort_by_name_action:
+                mSortOption = MediaStore.Video.Media.TITLE;
+                sharedPreferences.edit().putString(CURRENT_SORT_OPTION_KEY, mSortOption).apply();
+                LoaderManager.getInstance(this).restartLoader(LOAD_FILES_LOADER_ID, null, this);
+                Log.e(TAG, "onOptionsItemSelected: sort name");
+                return true;
+            case R.id.sort_date_added_action:
+                mSortOption = MediaStore.Video.Media.DATE_ADDED;
+                sharedPreferences.edit().putString(CURRENT_SORT_OPTION_KEY, mSortOption).apply();
+                LoaderManager.getInstance(this).restartLoader(LOAD_FILES_LOADER_ID + 2, null, this);
+                Log.e(TAG, "onOptionsItemSelected: sort date");
+                return true;
         }
-
-
         return super.onOptionsItemSelected(item);
     }
 
@@ -259,18 +274,22 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 MediaStore.Audio.Media.DATE_ADDED,
                 MediaStore.Audio.Media.DURATION
         };
-
+        String sortOrder = mSortOption;
+        if(sortOrder.equals(MediaStore.Video.Media.DATE_ADDED)){
+            sortOrder += " DESC";
+        }
         return new CursorLoader(this,
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 projection,
                 null,
                 null,
-                null);
+                sortOrder);
     }
 
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor audioCursor) {
         // add the files to the list
+        mAudioFiles = new ArrayList<>();
         int idColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media._ID);
         int titleColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
         int artistColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
@@ -295,12 +314,11 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         Parcelable parcelable = Parcels.wrap(mAudioFiles);
         i.putExtra("MediaFiles", parcelable);
         bindService(i, myServiceConnection, BIND_AUTO_CREATE);
-        //  startService(i);
     }
 
     @Override
     public void onLoaderReset(@NonNull Loader<Cursor> loader) {
-        mAdapter.swapList(null);
+        mAdapter.swapList(new ArrayList<>());
     }
 
 }
