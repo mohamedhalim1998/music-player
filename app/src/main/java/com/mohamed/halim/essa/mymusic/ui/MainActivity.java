@@ -3,6 +3,7 @@ package com.mohamed.halim.essa.mymusic.ui;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
+import androidx.fragment.app.Fragment;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
@@ -45,7 +46,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
-public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>, ExoPlayer.EventListener {
+public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>, ExoPlayer.EventListener, SharedPreferences.OnSharedPreferenceChangeListener {
     // permission code
     private static final int READ_EXTERNAL_STORAGE_REQUEST_CODE = 120;
     // key for shared preference
@@ -104,6 +105,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         NotificationHelper.createTaskNotificationChannel(this);
         // get the initial values from SharedPreferences
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        sharedPreferences.registerOnSharedPreferenceChangeListener(this::onSharedPreferenceChanged);
         if (!sharedPreferences.contains(PODCAST_MODE_ENABLED_KEY)) {
             sharedPreferences.edit().putBoolean(PODCAST_MODE_ENABLED_KEY, false).apply();
             mPodcastMode = false;
@@ -159,6 +161,14 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         if (mPodcastMode) {
             viewSwitcher.showNext();
         }
+
+        mExoPlayerView.setOnClickListener(v -> {
+            findViewById(R.id.root_view).setVisibility(View.GONE);
+            PlayingFragment fragment = new PlayingFragment();
+            findViewById(R.id.fragment_holder).setVisibility(View.VISIBLE);
+            getSupportFragmentManager().beginTransaction().replace(R.id.fragment_holder, fragment).commit();
+            fragment.setPlayer(mMediaPlaybackService.getExoPlayer());
+        });
     }
 
 
@@ -166,6 +176,8 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     protected void onResume() {
         super.onResume();
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
+        mAudioListView.setAdapter(mAdapter);
+
     }
 
     /**
@@ -181,10 +193,13 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
     }
 
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
         unbindService(myServiceConnection);
+        PreferenceManager.getDefaultSharedPreferences(this).unregisterOnSharedPreferenceChangeListener(this::onSharedPreferenceChanged);
+
     }
 
 
@@ -246,14 +261,10 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             case R.id.sort_by_name_action:
                 mSortOption = MediaStore.Video.Media.TITLE;
                 sharedPreferences.edit().putString(CURRENT_SORT_OPTION_KEY, mSortOption).apply();
-                LoaderManager.getInstance(this).restartLoader(LOAD_FILES_LOADER_ID, null, this);
-                Log.e(TAG, "onOptionsItemSelected: sort name");
                 return true;
             case R.id.sort_date_added_action:
                 mSortOption = MediaStore.Video.Media.DATE_ADDED;
                 sharedPreferences.edit().putString(CURRENT_SORT_OPTION_KEY, mSortOption).apply();
-                LoaderManager.getInstance(this).restartLoader(LOAD_FILES_LOADER_ID + 2, null, this);
-                Log.e(TAG, "onOptionsItemSelected: sort date");
                 return true;
         }
         return super.onOptionsItemSelected(item);
@@ -275,7 +286,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 MediaStore.Audio.Media.DURATION
         };
         String sortOrder = mSortOption;
-        if(sortOrder.equals(MediaStore.Video.Media.DATE_ADDED)){
+        if (sortOrder.equals(MediaStore.Video.Media.DATE_ADDED)) {
             sortOrder += " DESC";
         }
         return new CursorLoader(this,
@@ -289,7 +300,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor audioCursor) {
         // add the files to the list
-        mAudioFiles = new ArrayList<>();
         int idColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media._ID);
         int titleColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
         int artistColumn = audioCursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
@@ -318,7 +328,14 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     @Override
     public void onLoaderReset(@NonNull Loader<Cursor> loader) {
-        mAdapter.swapList(new ArrayList<>());
+        mAdapter.swapList(null);
     }
 
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        if (key.equals(CURRENT_SORT_OPTION_KEY)) {
+            mAudioFiles.clear();
+            LoaderManager.getInstance(this).restartLoader(LOAD_FILES_LOADER_ID, null, this);
+        }
+    }
 }
